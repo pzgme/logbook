@@ -1,0 +1,25 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "logbook",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-09-01",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"assets": {
+		"directory": "./assets"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "logbook",
+			"database_id": "5002d9cb-1495-41f1-9c2c-bc62907e93ac"
+		}
+	],
+	"observability": {
+		"enabled": true,
+		"logs": {
+			"head_sampling_rate": 1
+		}
+	}
+}

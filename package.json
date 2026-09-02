@@ -1,0 +1,23 @@
+{
+  "name": "cloudflare-logbook",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create logbook",
+    "db:migrate:local": "wrangler d1 migrations apply logbook --local",
+    "db:migrate:remote": "wrangler d1 migrations apply logbook --remote",
+    "secret:password": "wrangler secret put ADMIN_PASSWORD",
+    "secret:session": "wrangler secret put SESSION_SECRET",
+    "whoami": "wrangler whoami"
+  },
+  "dependencies": {
+    "hono": "^4.13.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260902.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.128.0"
+  }
+}

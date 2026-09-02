@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Logbook</title>
+<style>
+  :root {
+    --bg: #f7f7f8;
+    --surface: #ffffff;
+    --border: #e3e3e6;
+    --text: #1c1c1f;
+    --muted: #6b6b76;
+    --accent: #2563eb;
+    --danger: #dc2626;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16161a;
+      --surface: #1e1e23;
+      --border: #33333a;
+      --text: #ececf1;
+      --muted: #9b9ba6;
+      --accent: #60a5fa;
+      --danger: #f87171;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 24px 16px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  h1 { font-size: 18px; font-weight: 500; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  input, select, textarea, button {
+    font: inherit; font-size: 14px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  button.ghost { background: transparent; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .grow { flex: 1; min-width: 160px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .card-title { font-weight: 500; flex: 1; word-break: break-word; }
+  .content { white-space: pre-wrap; word-break: break-word; color: var(--text); }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 8px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; }
+  .DEBUG { background: #eceff3; color: #4b5563; }
+  .INFO  { background: #e0edff; color: #1d4ed8; }
+  .WARN  { background: #fef3c7; color: #92400e; }
+  .ERROR { background: #fee2e2; color: #b91c1c; }
+  .FATAL { background: #4c1d95; color: #f5f3ff; }
+  .actions { display: flex; gap: 6px; }
+  .actions button { padding: 4px 10px; font-size: 13px; }
+  .pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; color: var(--muted); font-size: 13px; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+  .overlay {
+    position: fixed; inset: 0;
+    background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px;
+    z-index: 100;
+  }
+  .overlay[hidden] { display: none; }
+  .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; width: 100%; max-width: 360px; }
+  .login-box h2 { font-size: 16px; font-weight: 500; margin-bottom: 16px; }
+  .login-box input { width: 100%; margin-bottom: 10px; }
+  .login-box button { width: 100%; }
+  .msg { font-size: 13px; min-height: 20px; margin-top: 8px; }
+  .err { color: var(--danger); }
+  dialog {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); color: var(--text); padding: 20px;
+    width: min(560px, 92vw);
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  dialog label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  dialog input, dialog select, dialog textarea { width: 100%; }
+  dialog textarea { min-height: 140px; resize: vertical; font-family: ui-monospace, Consolas, monospace; }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+</style>
+</head>
+<body>
+
+<div id="login" class="overlay">
+  <form class="login-box" id="login-form">
+    <h2>请输入管理密码</h2>
+    <input type="password" id="password" placeholder="密码" autocomplete="current-password" autofocus>
+    <button type="submit" class="primary" id="login-btn">登录</button>
+    <p class="msg err" id="login-msg"></p>
+  </form>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <header>
+    <h1>Logbook</h1>
+    <button class="ghost" id="logout">退出</button>
+  </header>
+
+  <div class="toolbar">
+    <input class="grow" id="keyword" placeholder="搜索标题或内容，回车执行">
+    <select id="level">
+      <option value="">全部级别</option>
+      <option>DEBUG</option><option>INFO</option>
+      <option>WARN</option><option>ERROR</option><option>FATAL</option>
+    </select>
+    <input id="category" placeholder="分类" style="width:120px">
+    <button id="export">导出</button>
+    <button id="import">导入</button>
+    <button class="primary" id="create">新增</button>
+  </div>
+
+  <div id="list"></div>
+  <div class="pager">
+    <button id="prev">上一页</button>
+    <span id="page-info"></span>
+    <button id="next">下一页</button>
+  </div>
+</div>
+
+<dialog id="editor">
+  <form id="edit-form">
+    <h2 id="edit-title" style="font-size:16px;font-weight:500">新增日志</h2>
+    <label>标题</label>
+    <input id="f-title" maxlength="200">
+    <label>级别</label>
+    <select id="f-level">
+      <option>DEBUG</option><option selected>INFO</option>
+      <option>WARN</option><option>ERROR</option><option>FATAL</option>
+    </select>
+    <label>分类</label>
+    <input id="f-category" maxlength="50" placeholder="default">
+    <label>内容</label>
+    <textarea id="f-content" required maxlength="20000"></textarea>
+    <p class="msg err" id="edit-msg"></p>
+    <div class="dialog-actions">
+      <button type="button" class="ghost" id="cancel">取消</button>
+      <button type="submit" class="primary">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="export-dlg">
+  <form id="export-form">
+    <h2 style="font-size:16px;font-weight:500">导出日志</h2>
+    <p style="font-size:13px;color:var(--muted);margin-top:6px">
+      沿用当前列表的级别、分类与关键词筛选
+    </p>
+    <label>格式</label>
+    <select id="x-format">
+      <option value="csv">CSV（Excel 可直接打开）</option>
+      <option value="md">Markdown</option>
+    </select>
+    <label>起始日期（留空不限）</label>
+    <input type="date" id="x-from">
+    <label>截止日期（留空不限）</label>
+    <input type="date" id="x-to">
+    <p class="msg err" id="x-msg"></p>
+    <div class="dialog-actions">
+      <button type="button" class="ghost" id="x-cancel">取消</button>
+      <button type="submit" class="primary">导出</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="import-dlg">
+  <form id="import-form">
+    <h2 style="font-size:16px;font-weight:500">导入日志</h2>
+    <p style="font-size:13px;color:var(--muted);margin-top:6px">
+      支持从本系统导出的 CSV 或 Markdown 文件恢复。导入为<b>新增</b>记录，原有数据不会被覆盖。
+    </p>
+    <label>选择文件（.csv 或 .md）</label>
+    <input type="file" id="i-file" accept=".csv,.md,.markdown,text/csv,text/markdown">
+    <p class="msg err" id="i-msg"></p>
+    <div class="dialog-actions">
+      <button type="button" class="ghost" id="i-cancel">取消</button>
+      <button type="submit" class="primary">导入</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const PAGE_SIZE = 20;
+let state = { offset: 0, level: '', category: '', keyword: '', total: 0 };
+let editingId = null;
+
+const $ = (id) => document.getElementById(id);
+const loginLayer = $('login');
+const appLayer = $('app');
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { showLogin(); throw new Error(data.error || '未登录'); }
+  if (!res.ok) throw new Error(data.error || '请求失败');
+  return data;
+}
+
+function showLogin(msg = '') {
+  appLayer.hidden = true;
+  loginLayer.hidden = false;
+  $('login-msg').textContent = msg;
+  $('password').focus();
+}
+
+function showApp() {
+  loginLayer.hidden = true;
+  appLayer.hidden = false;
+  load();
+}
+
+function formatTime(ts) {
+  return new Date(ts).toLocaleString('zh-CN', { hour12: false });
+}
+
+function renderList(items) {
+  const list = $('list');
+  list.textContent = '';
+
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'empty';
+    empty.textContent = '暂无日志记录';
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const item of items) {
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const head = document.createElement('div');
+    head.className = 'card-head';
+
+    const badge = document.createElement('span');
+    badge.className = 'badge ' + item.level;
+    badge.textContent = item.level;
+
+    const title = document.createElement('span');
+    title.className = 'card-title';
+    title.textContent = item.title || '(无标题)';
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'ghost';
+    editBtn.textContent = '编辑';
+    editBtn.onclick = () => openEditor(item);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'ghost';
+    delBtn.textContent = '删除';
+    delBtn.onclick = () => removeLog(item);
+
+    actions.append(editBtn, delBtn);
+    head.append(badge, title, actions);
+
+    const content = document.createElement('div');
+    content.className = 'content';
+    content.textContent = item.content;
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = `分类 ${item.category} · 创建 ${formatTime(item.created_at)} · 更新 ${formatTime(item.updated_at)}`;
+
+    card.append(head, content, meta);
+    list.appendChild(card);
+  }
+}
+
+async function load() {
+  const params = new URLSearchParams({
+    limit: String(PAGE_SIZE),
+    offset: String(state.offset),
+  });
+  if (state.level) params.set('level', state.level);
+  if (state.category) params.set('category', state.category);
+  if (state.keyword) params.set('keyword', state.keyword);
+
+  try {
+    const data = await api('/api/logs?' + params.toString());
+    state.total = data.total;
+    renderList(data.items);
+
+    const page = Math.floor(state.offset / PAGE_SIZE) + 1;
+    $('page-info').textContent = `第 ${page} 页 · 共 ${data.total} 条`;
+    $('prev').disabled = state.offset === 0;
+    $('next').disabled = state.offset + PAGE_SIZE >= data.total;
+  } catch (e) {
+    $('list').textContent = '';
+    const p = document.createElement('p');
+    p.className = 'empty err';
+    p.textContent = e.message;
+    $('list').appendChild(p);
+  }
+}
+
+function openEditor(item) {
+  editingId = item ? item.id : null;
+  $('edit-title').textContent = item ? '编辑日志' : '新增日志';
+  $('f-title').value = item ? item.title : '';
+  $('f-level').value = item ? item.level : 'INFO';
+  $('f-category').value = item ? item.category : '';
+  $('f-content').value = item ? item.content : '';
+  $('edit-msg').textContent = '';
+  $('editor').showModal();
+}
+
+async function removeLog(item) {
+  if (!confirm('确认删除这条日志？此操作不可恢复。')) return;
+  try {
+    await api('/api/logs/' + item.id, { method: 'DELETE' });
+    load();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+$('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('login-btn');
+  btn.disabled = true;
+  try {
+    await api('/api/login', {
+      method: 'POST',
+      body: JSON.stringify({ password: $('password').value }),
+    });
+    $('password').value = '';
+    showApp();
+  } catch (e) {
+    $('login-msg').textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('logout').addEventListener('click', async () => {
+  await api('/api/logout', { method: 'POST' }).catch(() => {});
+  showLogin();
+});
+
+$('edit-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    title: $('f-title').value,
+    level: $('f-level').value,
+    category: $('f-category').value || 'default',
+    content: $('f-content').value,
+  };
+  if (!payload.content.trim()) {
+    $('edit-msg').textContent = '内容不能为空';
+    return;
+  }
+  try {
+    if (editingId) {
+      await api('/api/logs/' + editingId, { method: 'PUT', body: JSON.stringify(payload) });
+    } else {
+      await api('/api/logs', { method: 'POST', body: JSON.stringify(payload) });
+    }
+    $('editor').close();
+    load();
+  } catch (e) {
+    $('edit-msg').textContent = e.message;
+  }
+});
+
+$('cancel').addEventListener('click', () => $('editor').close());
+$('create').addEventListener('click', () => openEditor(null));
+
+$('export').addEventListener('click', () => {
+  $('x-msg').textContent = '';
+  $('export-dlg').showModal();
+});
+$('x-cancel').addEventListener('click', () => $('export-dlg').close());
+
+$('import').addEventListener('click', () => {
+  $('i-msg').textContent = '';
+  $('i-file').value = '';
+  $('import-dlg').showModal();
+});
+$('i-cancel').addEventListener('click', () => $('import-dlg').close());
+
+$('import-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = $('i-file').files[0];
+  if (!file) {
+    $('i-msg').textContent = '请先选择文件';
+    return;
+  }
+  try {
+    const text = await file.text();
+    const res = await api('/api/import', {
+      method: 'POST',
+      body: JSON.stringify({ text, filename: file.name }),
+    });
+    $('import-dlg').close();
+    load();
+    alert(`导入完成：新增 ${res.imported} 条${res.skipped ? `，跳过 ${res.skipped} 条无效数据` : ''}`);
+  } catch (err) {
+    $('i-msg').textContent = err.message;
+  }
+});
+
+$('export-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const format = $('x-format').value;
+  const params = new URLSearchParams({ format });
+  if (state.level) params.set('level', state.level);
+  if (state.category) params.set('category', state.category);
+  if (state.keyword) params.set('keyword', state.keyword);
+  if ($('x-from').value) params.set('from', $('x-from').value);
+  if ($('x-to').value) params.set('to', $('x-to').value);
+
+  try {
+    const res = await fetch('/api/export?' + params.toString(), { credentials: 'same-origin' });
+    if (res.status === 401) { showLogin(); return; }
+    if (!res.ok) throw new Error('导出失败');
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'logbook-export.' + format;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    $('export-dlg').close();
+  } catch (err) {
+    $('x-msg').textContent = err.message;
+  }
+});
+
+$('keyword').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  state.keyword = e.target.value.trim();
+  state.offset = 0;
+  load();
+});
+$('level').addEventListener('change', (e) => {
+  state.level = e.target.value;
+  state.offset = 0;
+  load();
+});
+$('category').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  state.category = e.target.value.trim();
+  state.offset = 0;
+  load();
+});
+$('prev').addEventListener('click', () => {
+  state.offset = Math.max(0, state.offset - PAGE_SIZE);
+  load();
+});
+$('next').addEventListener('click', () => {
+  state.offset += PAGE_SIZE;
+  load();
+});
+
+(async function init() {
+  try {
+    const data = await api('/api/session');
+    data.authenticated ? showApp() : showLogin();
+  } catch {
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>
